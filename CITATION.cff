@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+
+message: "If you use SafeAgent in your research, please cite this software."
+
+type: software
+
+title: "SafeAgent: A Research Framework for Reliable and Risk-Aware AI Agent Execution"
+
+authors:
+  - family-names: Kantimahanti
+    given-names: Venkata Siva Gowri Naresh
+    orcid: "https://orcid.org/0009-0003-0230-3515"
+
+repository-code: "https://github.com/vkantimahanti/safeagent"
+
+abstract: >-
+  SafeAgent is an open-source research project investigating reliable
+  and risk-aware recovery mechanisms for AI agents operating in
+  state-changing enterprise workflows. The project evaluates
+  idempotency, uncertain execution outcomes, recovery strategies,
+  and operational safety using reproducible experiments.
+
+keywords:
+  - Artificial Intelligence
+  - AI Agents
+  - Agent Reliability
+  - Distributed Systems
+  - Idempotency
+  - Fault Tolerance
+  - LLMOps
+  - Enterprise AI

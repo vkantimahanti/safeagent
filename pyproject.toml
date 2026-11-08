@@ -8,10 +8,17 @@ version = "0.1.0"
 description = "Research framework for reliable enterprise AI agent execution"
 requires-python = ">=3.10"
 
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "httpx>=0.27",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+

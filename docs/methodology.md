@@ -58,20 +58,20 @@ Can a recovery policy incorporating execution evidence, operation risk, and auth
 
 **H2:** Idempotency-aware execution reduces duplicate records for repeated requests sharing the same logical operation identifier.
 
-**H3:** Verification-based recovery reduces unnecessary repeated operations when execution outcomes are uncertain.
+**H3:** Verification-based recovery avoids redundant execution when authoritative evidence confirms prior success; uncertain outcomes are escalated rather than automatically retried.
 
-**H4:** Risk-aware recovery can reduce unsafe actions while maintaining acceptable task-completion rates and execution overhead.
+**H4 (prospective):** A risk-aware recovery policy may reduce unsafe actions while maintaining acceptable task-completion rates and execution overhead compared with specified baselines.
 
 ### Current Hypothesis Status
 
-| Hypothesis | Status                                         | Supporting Experiment |
-| ---------- | ---------------------------------------------- | --------------------- |
-| H1         | Supported in deterministic baseline            | EXP-001               |
-| H2         | Initially supported under sequential execution | EXP-002               |
-| H3         | Untested                                       | EXP-003 planned       |
-| H4         | Untested                                       | EXP-004 planned       |
+| Hypothesis | Evidence status | Relevant experiments |
+| --- | --- | --- |
+| H1 | Supported in deterministic baseline only | EXP-001 |
+| H2 | Supported in tested sequential, threaded and SQLite-backed scenarios; no general distributed guarantee | EXP-002, EXP-003C, EXP-004 |
+| H3 | Mechanism behavior supported by deterministic tests; comparative reduction in unsafe actions not yet quantified | EXP-003B, EXP-004D |
+| H4 | Untested; prospective research hypothesis | EXP-006 |
 
-The initial experiments establish foundational behavior. They do not yet provide statistical evidence about performance under real-world operating conditions.
+The experiments establish controlled functional evidence, not statistical superiority, real-world reliability, or algorithmic novelty.
 
 ## 5. Experimental Environment
 
@@ -123,22 +123,17 @@ Independent scripts execute the naive and idempotency-aware workflows.
 
 Pytest validates the expected behavior of the simulated services.
 
-The current environment does not implement actual network communication, persistent storage, concurrency protection, or AI agent orchestration.
+The original baseline uses in-memory storage. Subsequent experiments add controlled thread concurrency, SQLite transactional persistence, multiprocess execution, and initial HTTP endpoints. Autonomous AI agent orchestration and real network-failure injection have not been evaluated.
 
-### 5.3 Planned Environment Extensions
+### 5.3 Implemented Extensions and Planned Capabilities
 
-Future experiments may introduce:
+**Implemented:** deterministic post-execution acknowledgment-loss injection; verification/recovery decision controller; thread-level race demonstration; SQLite transactional ticket and operation records; two-process shared-database test; persistent operation lookup; initial FastAPI health and root endpoints.
 
-* HTTP-based API interactions.
-* Persistent transactional storage.
-* Controlled failure injection.
-* Concurrent requests.
-* AI agent orchestration.
-* Execution tracing and observability.
-* Containerized execution.
-* Repeated benchmark workloads.
+**Not yet evaluated:** real network faults, abrupt process crashes, authenticated/authorized HTTP tool execution, autonomous agent orchestration, container orchestration, sustained benchmarks, and cross-system replication.
 
-These extensions will be introduced incrementally and documented when implemented.
+### 5.4 Software and Evidence Provenance
+
+Observed development environment: Windows, Python 3.12.7, SQLite 3.45.3, pytest 9.2.0; for EXP-005, FastAPI 0.162.2, Uvicorn 0.54.0, HTTPX 0.28.1. These are observed versions, not a fully pinned reproducible lockfile. Repository source and tests are the primary executable evidence. Results in this document refer to the specific tests and demonstrations described; they should not be interpreted as independent replication.
 
 ## 6. Experimental Design
 
@@ -369,7 +364,7 @@ python -m pytest -v
 
 ### EXP-003: Uncertain Execution Outcomes
 
-**Status:** Planned
+**Status:** Completed for EXP-003A, EXP-003B and EXP-003C
 
 #### Objective
 
@@ -381,14 +376,14 @@ An operation may complete successfully even when the calling application does no
 
 This creates uncertainty about whether the operation should be retried.
 
-#### Proposed Failure Scenarios
+#### Failure Scenarios (implemented and prospective)
 
-1. Failure before the operation commits.
-2. Failure after commit but before acknowledgment.
-3. Delayed API response.
-4. Repeated requests after a simulated timeout.
+1. Failure before commit: transaction rollback tested in EXP-004B, not a network failure.
+2. Failure after commit but before acknowledgment: simulated in EXP-003A and EXP-004D.
+3. Delayed API response: not yet evaluated.
+4. Repeated requests after a simulated timeout: evaluated in EXP-003A.
 
-#### Proposed Recovery Strategies
+#### Recovery Strategies
 
 **Strategy A: Unconditional Retry**
 
@@ -404,7 +399,7 @@ The caller attempts to determine the previous operation's outcome before decidin
 
 #### Evaluation
 
-The experiment will compare recovery strategies using metrics such as:
+Evaluation dimensions include:
 
 * Duplicate operation rate.
 * Task completion rate.
@@ -412,263 +407,398 @@ The experiment will compare recovery strategies using metrics such as:
 * Recovery latency.
 * Additional execution attempts.
 
-Experimental parameters and fault-injection procedures will be finalized before implementation.
+Current results are deterministic functional checks. Comparative latency, workload-scale metrics, and statistical analysis remain prospective.
 
----
 
-### EXP-004: Risk-Aware Recovery
+#### EXP-003A: Lost Acknowledgment Simulation
 
-**Status:** Planned
+**Status:** Completed — Initial Sequential Evaluation
 
-#### Objective
+**Objective**
 
-Evaluate a proposed recovery policy that considers operation risk, execution evidence, and authorization state.
+Evaluate how naive and idempotency-aware retries behave when a ticket is successfully created but its acknowledgment is lost.
 
-#### Research Direction
+**Implementation**
 
-The experiment will investigate whether recovery decisions can be improved by considering factors beyond retry availability.
+A controlled failure injector executes the ticket-creation operation and then raises a simulated `TimeoutError` before returning the result.
 
-Potential factors include:
+The experiment compares two recovery strategies:
 
-* Whether the operation changes business state.
-* Whether the operation is reversible.
-* Whether an idempotency mechanism is available.
-* Whether execution evidence indicates prior success.
-* Whether authorization is still valid.
-* Whether retrying could produce an unsafe business outcome.
+1. Naive retry without idempotency protection.
+2. Idempotency-aware retry using the original operation identifier.
 
-#### Proposed Evaluation
+**Observed Results**
 
-The proposed mechanism will be compared against established recovery approaches.
+| Metric                         | Naive Retry | Idempotent Retry |
+| ------------------------------ | ----------- | ---------------- |
+| Intended logical operations    | 1           | 1                |
+| Execution attempts             | 2           | 2                |
+| Simulated lost acknowledgments | 1           | 1                |
+| Tickets created                | 2           | 1                |
+| Duplicate tickets              | 1           | 0                |
+| Retry ticket                   | T-1002      | T-1001           |
 
-Evaluation may consider:
+**Automated Tests**
 
-* Unsafe action rate.
-* Duplicate operation rate.
-* Task completion rate.
-* Recovery success rate.
-* Recovery latency.
-* Execution overhead.
+* Total tests: 8
+* Passed: 8
+* Failed: 0
+* Execution time: 0.09 seconds
 
-The algorithm, baselines, and evaluation design will be documented after the research gap and implementation have been established.
+**Findings**
 
-No claims of novelty or performance improvement are made at this stage.
+The experiment confirmed that a simulated acknowledgment loss can cause the caller to observe a timeout even though the business operation succeeded.
 
-## 7. Evaluation Metrics
+Naive retry created a duplicate ticket.
 
-The following metrics are proposed for future comparative experiments.
+Idempotency-aware retry returned the original ticket without creating an additional record.
 
-### 7.1 Duplicate Operation Rate
+**Limitations**
 
-**Definition:**
+* Single-process, sequential execution.
+* In-memory storage.
+* No actual HTTP communication.
+* No concurrent requests.
+* No persistent operation history.
+* No statistical performance evaluation.
 
-The number of unintended duplicate business operations relative to the number of intended logical operations.
+**Reproducibility**
 
-**Formula:**
+Experiment:
 
-Duplicate Operation Rate = Duplicate business operations / Total intended logical operations
+`experiments/recovery/lost_acknowledgment.py`
 
-### 7.2 Task Completion Rate
+Tests:
 
-**Definition:**
+`tests/test_acknowledgment_loss.py`
 
-The proportion of attempted logical workflows that successfully achieve their intended business outcome.
-
-**Formula:**
-
-Task Completion Rate = Successfully completed logical workflows / Total attempted logical workflows
-
-### 7.3 Recovery Success Rate
-
-**Definition:**
-
-The proportion of injected failure scenarios successfully recovered by the evaluated strategy.
-
-**Formula:**
-
-Recovery Success Rate = Successfully recovered failure scenarios / Total injected failure scenarios
-
-### 7.4 Recovery Latency
-
-**Definition:**
-
-Elapsed time between failure detection and successful recovery or final termination.
-
-**Measurement:**
-
-Milliseconds or seconds.
-
-### 7.5 Unsafe Action Rate
-
-**Definition:**
-
-The proportion of attempted state-changing operations that violate predefined safety policies.
-
-**Formula:**
-
-Unsafe Action Rate = Operations violating defined safety policies / Total attempted state-changing operations
-
-### 7.6 Execution Overhead
-
-**Definition:**
-
-Additional resources required by a recovery strategy compared with the baseline.
-
-Potential measurements include:
-
-* Additional API calls.
-* Processing time.
-* Computational resources.
-* Verification requests.
-* Storage operations.
-
-Metric definitions, measurement procedures, and statistical methods will be refined before comparative experiments.
-
-## 8. Reproducibility
-
-SafeAgent aims to maintain a reproducible experimental environment through:
-
-1. Version-controlled source code.
-2. Documented experiment configurations.
-3. Automated tests.
-4. Explicit software dependencies.
-5. Repeatable execution commands.
-6. Recorded experiment results.
-7. Documented assumptions and limitations.
-
-### 8.1 Installation
-
-From the project root:
+Run:
 
 ```bash
-python -m pip install -e ".[dev]"
-```
-
-### 8.2 Execute EXP-001
-
-```bash
-python experiments/baselines/naive_retry.py
-```
-
-### 8.3 Execute EXP-002
-
-```bash
-python experiments/baselines/idempotent_retry.py
-```
-
-### 8.4 Run Automated Tests
-
-```bash
+python experiments/recovery/lost_acknowledgment.py
 python -m pytest -v
 ```
 
-### 8.5 Research Journal
+**Conclusion**
 
-Experiment observations and implementation decisions are maintained in:
+EXP-003A demonstrates that idempotency-aware retry prevents duplicate ticket creation following simulated acknowledgment loss in the implemented environment.
 
-`docs/research_journal.md`
+---
 
-The research journal records observed results separately from the methodology.
+#### EXP-003B: Verification-Based Recovery
 
-### 8.6 Future Reproducibility Improvements
+**Status:** Completed — deterministic functional evaluation
 
-Future benchmark releases will record:
+**Objective.** Determine whether checking operation state before retrying can prevent a redundant action following an uncertain acknowledgment.
 
-* Python and dependency versions.
-* Experimental configuration files.
-* Random seeds where applicable.
-* Failure-injection parameters.
-* Repeated trial results.
-* Statistical uncertainty.
-* Relevant execution logs and traces.
+**Implementation.** `VerificationRecoveryController` maps `VerificationStatus` to `RecoveryDecision`. `ServiceStateVerifier` looks up a ticket by operation identifier using `get_ticket_by_operation`.
+
+| Verification state | Controller decision | Interpretation |
+| --- | --- | --- |
+| `SUCCESS` | `STOP` | Existing operation is confirmed; do not execute again |
+| `NOT_EXECUTED` | `RETRY` | Only authoritative proof of non-execution can permit a retry decision; separate policy/authorization checks still apply |
+| `UNKNOWN` | `ESCALATE` | Evidence is insufficient; no automatic retry |
+
+Verifier exceptions and unrecognized statuses also result in `ESCALATE`. Importantly, a missing registry entry is treated as `UNKNOWN`, **not** proof of non-execution.
+
+**Procedure.** Test the three state mappings, error handling, and service lookup after simulated acknowledgment loss. Compare the resulting controller decision with the expected safety rule.
+
+**Observed evidence.** The tests passed for successful-operation stopping, authoritative non-execution retry decision, unknown-outcome escalation, verifier exceptions, and unrecognized statuses. After simulated lost acknowledgment, the service verifier located the ticket and returned `SUCCESS`, leading to `STOP`.
+
+**Evidence:** `src/safeagent/recovery/verification.py`; `src/safeagent/recovery/service_verifier.py`; `tests/test_verification_recovery.py`; `tests/test_service_state_verification.py`.
+
+**Limitations.** This is a decision-policy test, not an end-to-end authorization engine or measured comparison of production recovery strategies. The initial verifier used in-memory state.
+
+#### EXP-003C: Thread-Level Concurrency and Check-Then-Act Races
+
+**Status:** Completed — controlled two-thread evaluation
+
+**Objective.** Test whether a non-atomic lookup-then-create sequence can violate idempotency under simultaneous requests.
+
+**Procedure.** Run two threads with the same logical operation identifier. Use `threading.Barrier(2)` to reproduce the unsafe interleaving. Compare with a lock-protected implementation that guards the complete check-and-create critical section.
+
+| Measurement | Unsafe check-then-act | Shared-lock protection |
+| --- | ---: | ---: |
+| Concurrent requests | 2 | 2 |
+| Tickets created | 2 | 1 |
+| Unintended duplicate tickets | 1 | 0 |
+
+**Interpretation.** The observed race demonstrates why a sequential idempotency test does not establish concurrent safety. A shared process lock protected this particular critical section.
+
+**Evidence:** `experiments/recovery/concurrent_idempotency.py`; `tests/test_concurrent_idempotency.py`.
+
+**Limitations.** A Python lock does not coordinate independent processes or hosts. The two-thread setup is a deterministic counterexample, not a throughput benchmark.
+
+---
+
+### EXP-004: Persistent Idempotency and Recovery
+
+**Status:** Completed — tested local SQLite scenarios
+
+**Objective.** Evaluate whether transactional storage preserves one committed ticket per logical operation across service-object reinitialization, independent processes, and simulated acknowledgment loss.
+
+#### EXP-004A: Database Initialization
+
+**Implementation.** `initialize_database(db_path)` creates the parent directory and two SQLite tables: `tickets` (autoincrement ticket key, customer, issue, status) and `operations` (unique operation ID, unique ticket reference, original request fields, foreign key to tickets).
+
+**Invariant.** A committed operation identifier must resolve to its corresponding committed ticket. A unique operation ID must not map to multiple committed tickets.
+
+**Evidence:** `src/safeagent/services/database.py`; database-backed service tests.
+
+#### EXP-004B: Transactional Ticket Creation
+
+**Implementation.** `PersistentUtilityService.create_ticket(customer_id, issue, operation_id)` validates the operation ID, opens a SQLite connection, enables foreign-key enforcement, and starts `BEGIN IMMEDIATE`. Within one transaction it either returns the existing ticket for a matching operation/payload, rejects conflicting payload reuse, or inserts both ticket and operation mapping before commit. An error before commit rolls back both changes.
+
+**Test conditions.** First creation; identical retry; different service instance against the same database; conflicting payload; blank operation ID; deliberate failure of operation registration using a SQLite trigger.
+
+**Observed evidence.** Matching retries returned the original ticket; conflicting payloads were rejected; data remained accessible after service-object reinitialization; the injected registration failure did not leave a partially committed ticket.
+
+**Evidence:** `src/safeagent/services/persistent_utility_service.py`; `tests/test_persistent_utility_service.py`.
+
+**Implementation note.** On Windows, a temporary database could not be deleted while a SQLite connection remained open. The implementation was corrected to explicitly close connections with `contextlib.closing`; SQLite's connection transaction context manager alone does not close the connection.
+
+#### EXP-004C: Multiprocess Idempotency
+
+**Procedure.** Two independent Python processes use a shared SQLite database and submit the same operation ID. `BEGIN IMMEDIATE` coordinates writers; uniqueness constraints protect the operation mapping.
+
+**Observed evidence.** The test verified one stored ticket and the same ticket ID returned to both processes (observed `T-1` in the controlled run).
+
+**Evidence:** `tests/test_multiprocess_idempotency.py`; `src/safeagent/services/persistent_utility_service.py`.
+
+**Limitations.** Two local processes, one SQLite file, one controlled scenario. No sustained contention, crash injection, or distributed database deployment.
+
+#### EXP-004D: Persistent Acknowledgment Recovery
+
+**Procedure.** Commit ticket creation; inject `TimeoutError` after the side effect; instantiate a new service object against the same SQLite file; verify the operation; apply the recovery decision controller.
+
+**Observed evidence.** Committed operation was found, verification returned `SUCCESS`, and the controller returned `STOP`. The test found no duplicate ticket.
+
+**Evidence:** `tests/test_persistent_acknowledgment_recovery.py`; `src/safeagent/faults/acknowledgment_loss.py`; `src/safeagent/recovery/service_verifier.py`.
+
+**Limitations.** A new service object is not the same as a forcibly terminated OS process. The timeout is a Python simulation, not a dropped HTTP response.
+
+**EXP-004 conclusion.** SQLite transactions, unique operation identifiers, and persistent verification provided the expected idempotency and recovery behavior in the evaluated scenarios. This is established engineering practice tested in a constrained environment, not evidence of a new distributed transaction protocol.
+
+---
+
+### EXP-005: HTTP-Based Tool Execution
+
+**Status:** In progress — initial endpoints implemented; ticket-creation API not yet evaluated
+
+**Objective.** Introduce an HTTP boundary so subsequent experiments can investigate client/server acknowledgment loss, operation verification, and recovery without conflating them with direct in-process method calls.
+
+**Implemented:** `GET /health` returns HTTP 200 with `{"status": "healthy", "service": "safeagent"}`. `GET /` returns a welcome payload. Both passed dedicated FastAPI `TestClient` tests.
+
+**Planned:** `POST /tickets` backed by `PersistentUtilityService`; `GET /operations/{operation_id}`; request validation; conflict handling; isolated integration-test database; real HTTP fault injection; process restart scenarios.
+
+**Evidence:** `src/safeagent/api/main.py`; `tests/test_api_health.py`.
+
+**Current test status.** The existing suite was observed to collect 29 passing tests; the two API tests passed in a separate run. A combined 31-test run has not been evidenced in the supplied record.
+
+**Limitations.** A successful HTTP health response does not validate HTTP ticket execution, fault recovery, or agent integration.
+
+---
+
+### EXP-006: Risk-Aware Recovery
+
+**Status:** Planned — research hypothesis not yet evaluated
+
+**Objective.** Investigate whether recovery decisions should additionally consider operation impact, reversibility, authorization validity, and the strength of execution evidence.
+
+**Candidate inputs:** state-changing versus read-only operation; reversibility; available idempotency guarantees; evidence provenance; authorization freshness; expected harm from duplicate or omitted execution.
+
+**Proposed baselines:** unconditional retry, idempotency-aware retry, and verification-based recovery.
+
+**Proposed outcomes:** unsafe action rate, duplicate operation rate, task completion, recovery success, latency, and overhead.
+
+**Pre-registration requirements before testing:** define risk classes and policy rules, specify comparable workloads and fault distributions, establish baselines and safety oracles, run repeated trials, and report uncertainty intervals and adverse cases.
+
+No novelty, safety improvement, or performance claim is made for EXP-006 at this stage.
+
+---
+
+## 7. Evaluation Metrics
+
+Metrics are **defined here**, but most have **not yet been measured across a statistically meaningful workload**.
+
+| Metric | Operational definition | Current evidence |
+| --- | --- | --- |
+| Duplicate operation rate | `(committed business outcomes − intended successful logical outcomes, floored at zero) / intended logical operations` for a specified workload | Deterministic counts in EXP-001–004 |
+| Task completion rate | `logical workflows meeting predefined success criteria / attempted logical workflows` | Not benchmarked |
+| Recovery success rate | `injected failure cases ending in correct verified outcome / injected failure cases` | Individual functional scenarios only |
+| Recovery latency | Time from failure detection to verified recovery or terminal decision | Not benchmarked |
+| Unsafe action rate | `state-changing attempts violating a predefined safety rule / total state-changing attempts` | Not benchmarked |
+| Execution overhead | Extra API calls, verification requests, database operations, processing time, or resource use relative to a matched baseline | Not benchmarked |
+
+A **logical operation** must be identified independently of the number of attempts. For comparative studies, specify denominators, timeout boundaries, handling of unknown outcomes, trial counts, confidence intervals, and the ground-truth oracle before execution. Do not treat passing unit tests as statistical estimates.
+
+## 8. Reproducibility and Evidence Management
+
+### 8.1 Repository and installation
+
+SafeAgent uses a `src/` Python package layout and version-controlled tests. From the project root:
+
+```powershell
+python -m pip install -e ".[dev]"
+python -m pytest -v
+```
+
+`pyproject.toml` defines the package and pytest development dependency. FastAPI/Uvicorn/HTTPX were installed for EXP-005; dependency declarations and a pinned environment snapshot should be verified before public benchmark release.
+
+### 8.2 Reproduction entry points
+
+Confirmed script paths from the project record:
+
+```powershell
+python experiments/baselines/naive_retry.py
+python experiments/baselines/idempotent_retry.py
+python experiments/recovery/lost_acknowledgment.py
+python experiments/recovery/concurrent_idempotency.py
+```
+
+Other EXP-003/004 behaviors are reproducible through their corresponding pytest modules. Run from the project root:
+
+```powershell
+python -m pytest tests/test_verification_recovery.py tests/test_service_state_verification.py -v
+python -m pytest tests/test_concurrent_idempotency.py -v
+python -m pytest tests/test_persistent_utility_service.py -v
+python -m pytest tests/test_multiprocess_idempotency.py -v
+python -m pytest tests/test_persistent_acknowledgment_recovery.py -v
+python -m pytest tests/test_api_health.py -v
+```
+
+### 8.3 Evidence retention protocol
+
+For each experiment, retain: hypothesis; exact code revision/commit hash; environment and dependency versions; input and fault configuration; command executed; raw test or trace output; outcome table; known failures; limitations; and changes made after observing results.
+
+The companion `docs/research_journal.md` records observations and implementation decisions separately from planned methodology. Commit hashes, timestamps for every trial, and raw machine-readable result artifacts remain to be added.
+
+### 8.4 Repeatability and statistical rigor
+
+The current tests establish deterministic behavior, not statistical significance. Before making comparative performance or reliability claims, use repeated trials, representative workloads, controlled random seeds where applicable, confidence intervals, and predeclared success criteria. Document failed trials and exclusions rather than selectively reporting successes.
 
 ## 9. Threats to Validity
 
-The initial experiments have several limitations.
+1. **Construct validity:** Ticket duplication is a narrow proxy for broader safety. Define business harm and policy violations independently for future risk-aware evaluations.
+2. **Internal validity:** Fault injection occurs inside Python and may not model the timing or ambiguity of real network faults.
+3. **Concurrency validity:** The thread race and two-process SQLite test demonstrate limited interleavings, not correctness under arbitrary schedules or high load.
+4. **Durability validity:** Service-object reinitialization and committed SQLite writes do not establish survival under power loss, disk failure, or forced process termination.
+5. **External validity:** Synthetic utility-ticket requests do not establish transferability to healthcare, payments, or other regulated domains.
+6. **Agent validity:** No autonomous LLM agent has yet selected tools or decided on retries in the reported experiments.
+7. **Measurement validity:** Functional test pass counts do not estimate operational error rates, latency distributions, or statistical effect sizes.
+8. **Reproducibility gaps:** The public benchmark requires pinned dependencies, raw outputs, commit-linked runs, and documented platform-specific behavior.
 
-### 9.1 Simulated Environment
+**Mitigations planned:** real HTTP failure injection; process-crash tests; multiworker contention; alternative storage backends; independent safety oracles; repeated trials; agent integration; and external replication.
 
-The experiments use an in-memory utility service rather than a production enterprise system.
+## 10. Research Status and Interpretation
 
-Results may differ when interacting with external APIs, databases, and distributed services.
+| Experiment | Focus | Status |
+| --- | --- | --- |
+| EXP-001 | Naive retry | Completed |
+| EXP-002 | Sequential in-memory idempotency | Completed |
+| EXP-003A | Simulated acknowledgment loss | Completed |
+| EXP-003B | Verification-based recovery | Completed |
+| EXP-003C | Thread-level race | Completed |
+| EXP-004A | SQLite schema | Completed |
+| EXP-004B | Transactional idempotency | Completed |
+| EXP-004C | Two-process shared SQLite | Completed |
+| EXP-004D | Persistent acknowledgment recovery | Completed |
+| EXP-005 | HTTP integration | In progress |
+| EXP-006 | Risk-aware recovery | Planned |
 
-### 9.2 No Network Failure Simulation
+### 10.1 Supported findings
 
-Actual API timeouts, lost acknowledgments, and communication failures have not yet been simulated.
+Naive retries duplicated a ticket in the deterministic baseline; stable operation IDs prevented duplicates in tested sequential paths; a controlled race defeated an unsafe check-then-act pattern; shared locking protected the tested thread path; SQLite transactions preserved operation mappings across service-object reinitialization and the tested two-process run; persistent lookup after simulated acknowledgment loss supported a `STOP` decision.
 
-### 9.3 No Concurrency Testing
+### 10.2 Not established
 
-The current idempotency implementation has not been evaluated under simultaneous requests.
+The current evidence does **not** demonstrate a novel risk-aware algorithm, a production-safe AI agent, end-to-end network-failure resilience, generalized distributed exactly-once execution, statistically significant improvement over existing systems, or external scientific validation.
 
-Without synchronization or transactional storage, concurrent requests may create duplicate records.
+### 10.3 Next phase and publication readiness
 
-### 9.4 No Persistent Storage
+Complete HTTP ticket and verification endpoints; run fault-injected end-to-end tests; capture repeatable baseline comparisons and uncertainty estimates; then formulate and test a distinctive risk-aware policy against established methods. For a credible public research artifact, pair source code with commit-linked experimental logs, versioned data/configuration, a literature review, an explicit contribution statement, and independent review or replication.
 
-Operation history is lost when the application restarts.
+**Research-integrity note:** Technical documentation and open-source experiments can provide evidence of original technical work, but they do not by themselves establish eligibility under any immigration category or prove recognized scholarly impact. Any future EB-1A submission should rely on authentic, independently verifiable contributions and recognition.
 
-The current implementation cannot guarantee idempotency across process restarts.
 
-### 9.5 Limited Experimental Scale
 
-The experiments demonstrate deterministic behavior using a small number of requests.
+---
 
-They do not establish statistically significant performance differences.
+# 11. Research Methodology Update — EXP-005 through EXP-007 (2026-11-08)
 
-### 9.6 No AI Agent Integration
+> **Status precedence:** This section supersedes outdated *status* statements in Sections 5–10, while preserving their original procedures and observations. In particular, the earlier description of EXP-005 as health-only, and EXP-006 as the planned risk-aware experiment, are historical. Current numbering uses **EXP-006 for quantitative benchmarks** and **EXP-007 for risk-aware policy**.
 
-The initial experiments use direct Python method calls rather than autonomous AI agents.
+## 11.1 Scope and current implementation
 
-Agent-specific behaviors, such as tool selection, planning, and repeated reasoning, have not yet been evaluated.
+SafeAgent now includes an HTTP API (`GET /health`, `GET /`, `POST /tickets`, `GET /operations/{operation_id}`), a SQLite-backed idempotent ticket service, synchronous and asynchronous recovery clients, controlled HTTPX transport fault injection, and an initial risk-aware decision controller. The HTTP API uses Pydantic request/response validation, HTTP 409 for conflicting reuse of an operation ID, and HTTP 422 for invalid request payloads. An unknown operation lookup returns `UNKNOWN`, **not** `NOT_EXECUTED`.
 
-### 9.7 Limited Generalizability
+The currently implemented risk-aware controller is a deterministic policy; no LLM-powered agent or LangGraph orchestration has yet been verified. `EXP-007B` (trusted operation registry using Pydantic) has been specified but its test result has not been reported.
 
-Results from the simulated utility-ticket workflow cannot automatically be generalized to other enterprise systems.
+## 11.2 EXP-005 — HTTP tool execution and recovery (completed in controlled tests)
 
-Future experiments should consider additional state-changing operations and application domains.
+| Sub-experiment | Experimental condition | Observed/confirmed scope |
+| --- | --- | --- |
+| 005A–C | Health/root, ticket POST, operation verification GET | API tests passed; same-ID replay returns original ticket; conflicting payload rejected; unknown lookup is UNKNOWN |
+| 005D–F | Simulated missing POST acknowledgment and recovery client | Verified committed operation leads to STOP; unknown outcome leads to ESCALATE; controller returns `RecoveryResult.decision` |
+| 005G–H | `HTTPAcknowledgmentLossTransport` raises `httpx.ReadTimeout` **after** ASGI response is produced | HTTP client sees timeout while SQLite contains committed ticket; asynchronous verification can return STOP |
+| 005I | POST acknowledgment loss followed by verification GET failure | Conservative ESCALATE; committed ticket remains single |
+| 005J | Service-object reinitialization against same SQLite file | Committed operation found and STOP selected |
+| 005K | Clean exit of one Python process and recovery in a fresh process | Persistent state verified after process change; **not** a crash/power-loss test |
 
-### 9.8 Future Mitigation
+Transport failures are injected inside an HTTPX/ASGI test harness. They do not establish behavior under actual packet loss, TLS failures, remote server crashes, or network partitions. A cleanly restarted service is not an abruptly killed process.
 
-Future research will address these limitations through:
+**Key evidence paths:** `src/safeagent/api/main.py`, `src/safeagent/api/models.py`, `src/safeagent/api/dependencies.py`, `src/safeagent/recovery/http_client.py`, `src/safeagent/recovery/async_http_client.py`, `src/safeagent/faults/http_acknowledgment_loss.py`, `tests/test_http_transport_failure.py`, `tests/test_http_verification_failure.py`, `tests/test_api_service_restart.py`, and `tests/test_process_restart_recovery.py`.
 
-* Controlled failure injection.
-* Persistent transactional storage.
-* Concurrent execution.
-* Comparative recovery strategies.
-* Agent orchestration.
-* Repeated experimental trials.
-* Explicit statistical evaluation.
+## 11.3 EXP-006 — Quantitative and concurrency benchmarks
 
-## 10. Research Status
+| Experiment | Design | Observed results and interpretation |
+| --- | --- | --- |
+| 006A | 100 independent naive trials and 100 in-memory idempotent trials; two attempts per logical operation | Naive duplicate rate **100%**, idempotent **0%**. Mean operation times reported **0.0033 ms** and **0.0027 ms**, respectively. Deterministic toy workload; not production rates. |
+| 006B | 100 trials per strategy, comparing naive, in-memory idempotent, SQLite persistent | Mean latency **0.0124 ms**, **0.0090 ms**, **7.1360 ms** respectively. Durability and measurement conditions differ; not a matched overhead estimate. |
+| 006C | 10 trials each at 1, 2, 5, 10 workers against SQLite | Mean trial wall times **10.57**, **16.00**, **51.37**, **126.50 ms** respectively; 180 reported successful requests. Scheduling, initialization and SQLite contention may affect timing. |
+| 006D | 10 threads synchronized before submitting same operation ID | One unique returned ticket ID; independently checked **1 committed ticket** and **1 operation**. SQLite file handles explicitly closed on Windows. |
+| 006E | 5 asynchronous clients, each with post-response acknowledgment loss | Each recovered to STOP; independently checked 1 committed ticket and operation; in-process ASGI harness. |
+| 006F | 5 asynchronous clients; 2 receive HTTP success and 3 simulated timeouts | Test passed; shared operation ID produced 1 committed ticket and operation, and timed-out clients verified STOP. |
+| 006G | 100 trials for each of three deterministic scenarios | **300/300** expected recovery decisions. Scenario A SUCCESS→STOP; B verification timeout→ESCALATE; C missing lookup→ESCALATE. Mean recovery-phase latencies: **4.1316**, **0.2356**, **2.4436 ms**. Scenario B injects an immediate exception and does not model real timeout duration. |
+| 006H | 100 trials per scenario; fixed seed 42; shuffled trial order; simulated 50 ms verification delay; client-workflow timing | User confirmed benchmark executed successfully; **numerical CSV output not reviewed**, so no latency or accuracy figures are claimed here. Scenario C omits POST and is not equivalent end-to-end work. |
 
-| Experiment | Description                  | Status                            |
-| ---------- | ---------------------------- | --------------------------------- |
-| EXP-001    | Naive retry baseline         | Completed                         |
-| EXP-002    | Idempotency-aware execution  | Completed — Sequential Evaluation |
-| EXP-003    | Uncertain execution outcomes | Planned                           |
-| EXP-004    | Risk-aware recovery          | Planned                           |
+**Raw artifacts / scripts:** `results/exp006a/duplicate_rate.csv`, `results/exp006g/recovery_reliability.csv`, `results/exp006h/reproducible_recovery.csv` (when retained); `experiments/benchmarks/duplicate_rate.py`, `persistent_latency.py`, `concurrent_workload.py`, `synchronized_concurrency.py`, `recovery_reliability.py`, and `reproducible_recovery.py`. The named result files are intended repository locations; their presence in a given Git commit must be verified.
 
-### 10.1 Current Research Findings
+**EXP-006G policy accuracy is not an independently estimated probability of real-world recovery success.** Expected decisions were derived from the same specified policy tested under deterministic faults. For statistical reliability claims, define an independent outcome oracle, randomized failures, matched baselines, and uncertainty intervals.
 
-**EXP-001:** Repeated ticket-creation requests without idempotency protection produce duplicate tickets in the deterministic baseline.
+## 11.4 EXP-007 — Risk-aware policy
 
-**EXP-002:** Stable operation identifiers prevent duplicate ticket creation during sequential retries in the implemented in-memory service.
+**EXP-007A (completed):** `src/safeagent/recovery/risk_aware.py` defines LOW/MEDIUM/HIGH operation risk and a controller combining risk with verified execution status. All **9 parameterized policy tests passed**; the full test suite subsequently reported **58 passing tests**.
 
-These findings establish baseline behavior for future research.
+| Verification state | LOW | MEDIUM | HIGH |
+| --- | --- | --- | --- |
+| `SUCCESS` | STOP | STOP | STOP |
+| Authoritative `NOT_EXECUTED` | RETRY | RETRY | ESCALATE |
+| `UNKNOWN` | ESCALATE | ESCALATE | ESCALATE |
 
-They do not yet demonstrate a novel recovery mechanism.
+The high-risk `NOT_EXECUTED` branch requires further authorization by policy. This is a *proposed* policy, not an empirically validated optimal risk rule. The `RETRY` decision is permission under the tested policy, not evidence that the service has already retried or that all necessary authorization checks are enforced.
 
-### 10.2 Next Research Phase
+**EXP-007B (specified, not confirmed):** An operation registry maps `READ_CUSTOMER`→LOW, `CREATE_TICKET`→MEDIUM, `DISCONNECT_POWER`→HIGH with authorization required for disconnection. Pydantic validates types and schema, but does not establish whether risk labels are ethically or operationally appropriate. Five tests were proposed; do not claim 63 total tests until execution is confirmed.
 
-EXP-003 will investigate uncertain execution outcomes, including scenarios in which a service operation succeeds but its acknowledgment is lost.
+**EXP-007C/D (planned):** LangGraph-based agent workflow, followed by an LLM tool-selection agent. **EXP-008/009 (planned):** randomized agent failures, checkpoint/recovery behavior, process interruptions, and comparative evaluation. Project scope currently stops after EXP-009 for a research-readiness review.
 
-The experiment will compare recovery strategies using controlled failure injection and measurable reliability outcomes.
+## 11.5 Latest test and evidence status
 
-The objective is to establish stronger experimental evidence for evaluating recovery mechanisms under uncertainty.
+- **Last confirmed full test suite:** **58 passed**, after EXP-007A.
+- **EXP-007B:** implementation and tests proposed; passing result not confirmed.
+- **EXP-006H:** successful execution reported; actual per-scenario latency values not yet independently reviewed.
+- Tests establish correctness in specified environments; they do not establish safety guarantees, external validity, or novelty.
 
-### 10.3 Long-Term Research Direction
+### Additional reproducibility controls recommended
 
-The longer-term goal is to investigate reliable and risk-aware execution mechanisms for AI agents operating in state-changing enterprise workflows.
+1. Record commit SHA, timestamp, dependency versions, OS, SQLite settings, and exact command for every benchmark run.
+2. Store raw CSV outputs and an analysis script that reproduces all tables and summary statistics.
+3. Repeat each benchmark across multiple independent runs and report variability and confidence intervals.
+4. Separate POST latency, verification latency, and full client-workflow latency; use consistent timing boundaries when comparing strategies.
+5. Define independent ground-truth outcomes and a severity-weighted unsafe-action metric before evaluating risk-aware recovery.
+6. Test forced termination, restart with persisted checkpoints, and failure before/after commit; do not conflate clean process exit with crash recovery.
+7. Evaluate LangGraph baseline checkpointing separately from SafeAgent-specific policy contributions.
 
-Future research will focus on identifying and evaluating potential contributions that go beyond established idempotency and retry mechanisms.
+### Interpretation and research integrity
 
-Any claims regarding novelty, effectiveness, or generalizability will require appropriate literature review, controlled experiments, and independent validation.
+The implementation demonstrates known engineering methods—idempotency keys, transactional storage, verification before retry, conservative escalation—under increasingly varied controlled conditions. Distinct research novelty, improvement over established baselines, real-network fault tolerance, and production safety remain **unproven**. Research documentation is not itself evidence of scholarly recognition or immigration eligibility.

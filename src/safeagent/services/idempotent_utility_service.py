@@ -70,5 +70,22 @@ class IdempotentUtilityService:
 
         return ticket
 
+    def get_ticket_by_operation(self, operation_id: str):
+        """
+        Return the ticket associated with an operation ID.
+
+        Return None if the operation is not present in the
+        current in-memory registry.
+
+        Absence does not prove non-execution.
+        """
+        operation = self._operations.get(operation_id)
+
+        if operation is None:
+            return None
+
+        _, _, ticket_id = operation
+        return self._tickets[ticket_id]
+
     def list_tickets(self) -> List[ServiceTicket]:
         return list(self._tickets.values())

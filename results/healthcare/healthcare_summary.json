@@ -1,0 +1,33 @@
+{
+  "experiment": "Healthcare recovery policy simulation",
+  "trials": 1000,
+  "seed": 42,
+  "verification_statuses": {
+    "UNKNOWN": 335,
+    "SUCCESS": 338,
+    "NOT_EXECUTED": 327
+  },
+  "baseline_retries": 1000,
+  "safeagent_retries": 327,
+  "retry_reduction_pct": 67.3,
+  "baseline_policy_unsafe_retries": 673,
+  "safeagent_policy_unsafe_retries": 0,
+  "safeagent_stops": 338,
+  "safeagent_escalations": 335,
+  "safeagent_decision_latency_ms": {
+    "mean_ms": 0.0015077,
+    "median_ms": 0.0015,
+    "p95_ms": 0.0017
+  },
+  "transaction_completion_rate": null,
+  "actual_duplicate_submissions": null,
+  "limitations": [
+    "Synthetic policy inputs only",
+    "No real payer integration",
+    "No patient data",
+    "No actual network failures in this experiment",
+    "Transaction completion and duplicate rates not measured",
+    "Latency measures local decision execution only",
+    "Always-retry is a deliberately simple baseline"
+  ]
+}
